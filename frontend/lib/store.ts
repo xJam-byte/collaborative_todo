@@ -87,12 +87,12 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deleteTask: (taskId) => {
-    // Optimistic local delete
-    set((state) => ({
-      tasks: state.tasks.filter((t) => t.id !== taskId),
-    }));
     const payload = { taskId };
     if (!get().isConnected) {
+      // Optimistic local delete only if offline
+      set((state) => ({
+        tasks: state.tasks.filter((t) => t.id !== taskId),
+      }));
       get().enqueueAction({ type: 'DELETE_TASK', payload });
     } else {
       getSocket().emit('task:delete', payload);

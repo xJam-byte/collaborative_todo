@@ -71,9 +71,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setPresence(data.presence);
     };
 
+    const onError = (data: any) => {
+      if (data.requiresConfirmation) {
+        if (window.confirm(data.message)) {
+          // If confirmed, re-emit delete with forceDelete: true
+          socket.emit('task:delete', { taskId: data.taskId, forceDelete: true });
+        }
+      } else {
+        alert('Ошибка: ' + data.message);
+        // Force a re-sync to repair any optimistic updates that failed
+        socket.emit('list:join', { listId: useStore.getState().currentListId });
+      }
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('list:joined', onListJoined);
+    socket.on('error', onError);
     socket.on('task:created', onTaskCreated);
     socket.on('task:updated', onTaskUpdated);
     socket.on('task:deleted', onTaskDeleted);
@@ -90,6 +104,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('list:joined', onListJoined);
+      socket.off('error', onError);
       socket.off('task:created', onTaskCreated);
       socket.off('task:updated', onTaskUpdated);
       socket.off('task:deleted', onTaskDeleted);
