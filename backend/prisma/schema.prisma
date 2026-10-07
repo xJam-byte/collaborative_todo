@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ownedLists  TodoList[]
+  memberships ListMember[]
+  createdTasks Task[]       @relation("TaskCreator")
+  invitations Invitation[] @relation("InvitationSender")
+
+  @@map("users")
+}
+
+model TodoList {
+  id        String   @id @default(uuid())
+  title     String
+  ownerId   String   @map("owner_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner   User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members ListMember[]
+  tasks   Task[]
+  invitations Invitation[]
+
+  @@map("todo_lists")
+}
+
+enum ListRole {
+  ADMIN
+  MEMBER
+}
+
+model ListMember {
+  id     String   @id @default(uuid())
+  userId String   @map("user_id")
+  listId String   @map("list_id")
+  role   ListRole @default(MEMBER)
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  list TodoList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listId])
+  @@map("list_members")
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  text        String
+  completed   Boolean  @default(false)
+  position    String   // Fractional index for ordering (e.g., "a0", "a1", ...)
+  version     Int      @default(1) // Optimistic concurrency control
+  listId      String   @map("list_id")
+  creatorId   String   @map("creator_id")
+  deletedAt   DateTime? @map("deleted_at") // Soft delete for conflict handling
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  list    TodoList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  creator User     @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([listId, deletedAt])
+  @@index([listId, position])
+  @@map("tasks")
+}
+
+model Invitation {
+  id        String   @id @default(uuid())
+  listId    String   @map("list_id")
+  senderId  String   @map("sender_id")
+  email     String?  // Invite by email
+  token     String   @unique // Invite link token
+  accepted  Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  list   TodoList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  sender User     @relation("InvitationSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("invitations")
+}
